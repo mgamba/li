@@ -58,6 +58,43 @@ npm run
 ## Running a Crawl
 
 Let's use NYT as an example since it's a big data set.
+```
+./start --crawl nyt
+```
+This is calling the executable _start_ file in the root of the project with `--crawl nyt` option.  Inside the _start_ script,
+1. we're letting bash know to interpret the file as javascript
+  ```
+  #! /usr/bin/env node
+  ```
+2. `crawl` is set to `nyt`
+  ```
+  let { crawl, scrape, regenerate, regenTimeseries, runner } = makeNice(args)
+  ```
+3. and a nyt event is dispatched to the crawler, resulting in a crawl/cache of the resulting data
+  ```
+  if (crawl) {
+    await arc.events.publish({
+      name: 'crawler',
+      payload: {
+        source: crawl
+```
+
+There should now be `.gz` archive(s) of the source in _crawler-cache/nyt/<YYYY-MM-DD>/_ with `<YYYY-MM-DD>` being today's date.
+
+## Running a Scrape
+Assuming we have some data that's been crawled (and saved to cache), we can scrape it.  In this case, we'll assume that we've already run the crawler for "nyt" and have it cached locally in _crawler-cache/nyt/_:
+```
+./start --scrape nyt
+```
+This will scrape/format today's data and write it to the database.
+
+## Regenerating
+Sometimes data needs to be re-scraped.  In this case, we can run a single command to iterate through each day and re-scrape the data.
+```
+./start --regenerate nyt
+```
+
+This is automatically run for timeseries sources, which tend to correct themselves over time.
 
 # Understanding li
 
@@ -82,7 +119,7 @@ Every data source has a unique key, which is derived from the file path of the s
 
 ## Scrapers
 
-Opening _src/shared/sources/nyt/index.js_, we see an array of scrapers:
+Opening the source _src/shared/sources/nyt/index.js_, we see an array of scrapers:
 ```
 ...
   scrapers: [
@@ -124,6 +161,44 @@ This list of `scrapers` contains everything related to crawling and scraping.  T
     - these can be destructured in the first argument (ex. `scrape({county, city}, date)`)
     - and then accessed as individual variables (ex. `county.length`)
 
+## Timeseries Data
+
+Timeseries are anything that includes data over time.
+
+### Example 1
+Data is multiple days worth of data returned in a single request, often sorted by date.  Consider these two consecutive days of scraped data:
+4/14
+```
+date,num_cases
+2020-04-14,2187
+2020-04-13,2213
+2020-04-12,2343
+...
+```
+4/15
+```
+date,num_cases
+2020-04-15,1946
+2020-04-14,2216
+2020-04-13,2220
+2020-04-12,2343
+...
+```
+
+Notice that on 4/15, new data was added for that day.  But also the data for 4/14 and 4/13 was updated.  It's common for data to be updated over time in this manner to correct inaccuracies, especially for more recent data.
+
+### Example 2
+
+
+
+Time series are denoted by the `timeseries: true` on a data source definition.  For example in _src/shared/sources/nyt/index.js_:
+``` 
+...
+module.exports = {
+  country: 'iso1:US',
+  timeseries: true,
+...
+```
 
 # Credit
 
